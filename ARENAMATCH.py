@@ -82,8 +82,7 @@ if "torneios" not in st.session_state:
 
 if "editando_idx" not in st.session_state: st.session_state.editando_idx = None
 if "editando_cat" not in st.session_state: st.session_state.editando_cat = None
-if "tv_cat_ativa" not in st.session_state: st.session_state.tv_cat_ativa = CATEGORIAS_OFICIAIS[0]
-if "tv_pag_ativa" not in st.session_state: st.session_state.tv_pag_ativa = 0
+if "tv_cat_manual" not in st.session_state: st.session_state.tv_cat_manual = CATEGORIAS_OFICIAIS[0]
 
 # --- RECALCULADOR DE PONTUAÇÃO ---
 def atualizar_classificacao(cat):
@@ -149,7 +148,7 @@ def desenhar_quadra_virtual(dupla1, dupla2, num_jogo, p1, p2, encerrado, f_nome,
     """
     components.html(html_quadra, height=115, scrolling=False)
 
-# --- ⚙️ CENTRAL DE CONTROLE - SIDEBAR COMOCIONAL INTELLIGENT ---
+# --- ⚙️ CENTRAL DE CONTROLE - SIDEBAR ---
 with st.sidebar:
     st.markdown(f"## 🛠️ Painel {NOME_SISTEMA}")
     
@@ -160,12 +159,11 @@ with st.sidebar:
     is_admin = (senha == CHAVE_ADMIN)
     st.markdown("---")
     
-    # 🚨 BLINDAGEM DO BUG: Só exibe o seletor se você estiver na mesa administrando!
+    # Se estiver na Mesa Administrativa, escolhe por aqui o foco
     if modo_tela == "🎮 Mesa de Arbitragem":
         cat_foco = st.selectbox("🏆 Escolha a Categoria para Gerenciar:", CATEGORIAS_OFICIAIS)
     else:
-        st.info("📺 **Modo TV Ativo:** O telão está alternando as categorias automaticamente a cada 10s.")
-        cat_foco = CATEGORIAS_OFICIAIS[0] # Valor padrão neutro de background
+        st.info("📺 **Modo TV Otimizado:** Use o seletor no topo da tela para trocar de categoria manualmente.")
         
     if is_admin and st.button("🚨 RESETAR TODO O EVENTO"):
         if os.path.exists(ARQUIVO_BANCO): os.remove(ARQUIVO_BANCO)
@@ -174,7 +172,7 @@ with st.sidebar:
 st.markdown(f"<h1 style='text-align:center; color:#39ff14; margin-top:0;'>⚡ {NOME_SISTEMA}</h1>", unsafe_allow_html=True)
 
 # ----------------------------------------------------
-# VISUALIZAÇÃO 1: MESA DE ARBITRAGEM (TRAVADO E SEGURO)
+# VISUALIZAÇÃO 1: MESA DE ARBITRAGEM
 # ----------------------------------------------------
 if modo_tela == "🎮 Mesa de Arbitragem":
     t_dados = st.session_state.torneios[cat_foco]
@@ -298,32 +296,31 @@ if modo_tela == "🎮 Mesa de Arbitragem":
                                 salvar_dados(); st.rerun()
 
 # ----------------------------------------------------
-# VISUALIZAÇÃO 2: TELÃO DE TRANSMISSÃO DE TV (CARROSSEL AUTOMÁTICO)
+# VISUALIZAÇÃO 2: TELÃO DE TRANSMISSÃO DE TV (SELEÇÃO MANUAL)
 # ----------------------------------------------------
 else:
-    cat_tv_render = st.session_state.tv_cat_ativa
-    dados_tv = st.session_state.torneios[cat_tv_render]
+    # 🎯 SELETOR FORMATO SELEÇÃO NO TOPO DA TV
+    c_tv1, c_tv2 = st.columns([30, 70])
+    with c_tv1:
+        cat_escolhida_tv = st.selectbox(
+            "📺 TRANSMITIR TORNEIO:", 
+            CATEGORIAS_OFICIAIS, 
+            index=CATEGORIAS_OFICIAIS.index(st.session_state.tv_cat_manual)
+        )
+        st.session_state.tv_cat_manual = cat_escolhida_tv
+        
+    dados_tv = st.session_state.torneios[cat_escolhida_tv]
     
     st.markdown(f"""
-        <h2 style='text-align:center; color:#39ff14; font-weight:900; margin-top:0; background-color:#121824; padding:10px; border-radius:8px;'>
-            📺 CIRCUITO ARENA - {cat_tv_render.upper()}
+        <h2 style='text-align:center; color:#39ff14; font-weight:900; margin-top:5px; background-color:#121824; padding:10px; border-radius:8px;'>
+            📺 CIRCUITO ARENA - {cat_escolhida_tv.upper()}
         </h2>
     """, unsafe_allow_html=True)
     
     if dados_tv["fase"] == "Inscrição":
-        st.warning(f"Fase de captação de atletas. Sorteio de chaves pendente para: {cat_tv_render}.")
-        total_paginas_tv, proxima_pagina = 1, 0
-        idx_atual = CATEGORIAS_OFICIAIS.index(cat_tv_render)
-        proxima_categoria = CATEGORIAS_OFICIAIS[(idx_atual + 1) % len(CATEGORIAS_OFICIAIS)]
+        st.warning(f"Fase de captação de atletas. Sorteio de chaves pendente para: {cat_escolhida_tv}.")
     else:
         jogos_alvo_tv = dados_tv["jogos_eliminatoria"] if dados_tv["fase"] == "Eliminatoria" else dados_tv["jogos_grupos"]
-        
-        JOGOS_POR_PAGINA = 6
-        total_jogos_tv = len(jogos_alvo_tv)
-        total_paginas_tv = (total_jogos_tv + JOGOS_POR_PAGINA - 1) // JOGOS_POR_PAGINA
-        
-        pag_atual_tv = st.session_state.tv_pag_ativa
-        if pag_atual_tv >= total_paginas_tv: pag_atual_tv = 0
         
         col_esq, col_dir = st.columns([45, 55])
         
@@ -339,33 +336,18 @@ else:
                     st.table(df_exibir)
                 
         with col_dir:
-            st.markdown(f"<div class='titulo-secao'>🎾 Painel de Quadras (Grade {pag_atual_tv + 1}/{total_paginas_tv})</div>", unsafe_allow_html=True)
-            inicio_idx = pag_atual_tv * JOGOS_POR_PAGINA
-            fim_idx = inicio_idx + JOGOS_POR_PAGINA
-            lote_jogos_tv = jogos_alvo_tv[inicio_idx:fim_idx]
+            st.markdown(f"<div class='titulo-secao'>🎾 Painel Geral de Quadras</div>", unsafe_allow_html=True)
             
-            if lote_jogos_tv:
+            if jogos_alvo_tv:
                 grid_quadras_tv = st.columns(2)
-                for i_lote, jogo in enumerate(lote_jogos_tv):
-                    idx_real = inicio_idx + i_lote
-                    col_alvo = grid_quadras_tv[i_lote % 2]
+                for idx_real, jogo in enumerate(jogos_alvo_tv):
+                    col_alvo = grid_quadras_tv[idx_real % 2]
                     f_tag = jogo["fase"] if "fase" in jogo else jogo["grupo"]
                     
                     with col_alvo:
                         desenhar_quadra_virtual(jogo['d1'], jogo['d2'], idx_real + 1, jogo["p1"], jogo["p2"], jogo["encerrado"], f_tag, jogo["quadra"])
 
-        if (pag_atual_tv + 1) < total_paginas_tv:
-            proxima_pagina = pag_atual_tv + 1
-            proxima_categoria = cat_tv_render
-        else:
-            proxima_pagina = 0
-            idx_atual = CATEGORIAS_OFICIAIS.index(cat_tv_render)
-            proxima_categoria = CATEGORIAS_OFICIAIS[(idx_atual + 1) % len(CATEGORIAS_OFICIAIS)]
-
-    st.session_state.tv_pag_ativa = proxima_pagina
-    st.session_state.tv_cat_ativa = proxima_categoria
-    
-    # 🔄 ATUALIZADOR AUTOMÁTICO (10 SEGUNDOS)
+    # 🔄 ATUALIZADOR AUTOMÁTICO (10 SEGUNDOS) - SÓ ATUALIZA OS DADOS SEM TROCAR A CATEGORIA
     componente_js_multicat = """
         <script>
         setTimeout(function() {
