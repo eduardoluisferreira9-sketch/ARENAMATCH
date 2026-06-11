@@ -13,7 +13,7 @@ st.set_page_config(
 NOME_SISTEMA = "ArenaMatch Pro"
 CHAVE_ADMIN = "arena123"
 
-# 🎨 DESIGN ESPORTIVO PREMIUM (OPTIMIZADO PARA TV)
+# 🎨 DESIGN ESPORTIVO PREMIUM (TOTALMENTE OTIMIZADO PARA TV)
 st.markdown("""
     <style>
     .stApp { background-color: #0b0f19; } 
@@ -22,8 +22,8 @@ st.markdown("""
     h1, h2, h3, h4, h5, p, label, .stText, [data-testid="stMarkdownContainer"] p { color: #ffffff !important; }
     
     .titulo-secao {
-        color: #39ff14 !important; font-size: 1.4rem !important; font-weight: bold !important;
-        border-left: 5px solid #39ff14; padding-left: 10px; margin-top: 20px; margin-bottom: 15px; text-transform: uppercase;
+        color: #39ff14 !important; font-size: 1.3rem !important; font-weight: bold !important;
+        border-left: 5px solid #39ff14; padding-left: 10px; margin-top: 15px; margin-bottom: 10px; text-transform: uppercase;
     }
     
     div[data-testid="stTextInput"] input, div[data-testid="stSelectbox"] div {
@@ -32,8 +32,8 @@ st.markdown("""
     
     /* Estilo customizado para tabelas de grupos */
     div[data-testid="stTable"] table { border: 2px solid #1f293d !important; background-color: #121824 !important; width: 100%; }
-    div[data-testid="stTable"] th { background-color: #060911 !important; color: #39ff14 !important; border: 1px solid #1f293d !important; text-align: center !important; font-size: 0.9rem; padding: 4px !important; }
-    div[data-testid="stTable"] td { color: #ffffff !important; border: 1px solid #1f293d !important; text-align: center !important; font-weight: bold; font-size: 0.9rem; padding: 4px !important; }
+    div[data-testid="stTable"] th { background-color: #060911 !important; color: #39ff14 !important; border: 1px solid #1f293d !important; text-align: center !important; font-size: 0.85rem; padding: 4px !important; }
+    div[data-testid="stTable"] td { color: #ffffff !important; border: 1px solid #1f293d !important; text-align: center !important; font-weight: bold; font-size: 0.85rem; padding: 4px !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -51,33 +51,27 @@ if "jogos_grupos" not in st.session_state:
 if "tabelas_grupos" not in st.session_state:
     st.session_state.tabelas_grupos = {} 
 
-# --- RECALCULADOR DA MATRIZ DOS GRUPOS (CORRIGIDO E SEGURO) ---
+# --- RECALCULADOR DA MATRIZ DOS GRUPOS ---
 def atualizar_classificacao_grupos():
     tabelas_novas = {}
     
-    # Criar tabelas zeradas
     for nome_g, lista_duplas in st.session_state.grupos.items():
         tabelas_novas[nome_g] = pd.DataFrame({
             'Dupla': lista_duplas,
             'Pts': 0, 'Vit': 0, 'GP': 0, 'GC': 0, 'Saldo': 0
         }).set_index('Dupla')
     
-    # Processar cada jogo com a grafia perfeitamente corrigida
     for jogo in st.session_state.jogos_grupos:
         if jogo["encerrado"]:
             g = jogo["grupo"]
-            d1 = jogo["d1"]
-            d2 = jogo["d2"]  # <-- Corrigido aqui (estava job)
-            p1 = int(jogo["p1"])
-            p2 = int(jogo["p2"])
+            d1, d2 = jogo["d1"], jogo["d2"]
+            p1, p2 = int(jogo["p1"]), int(jogo["p2"])
             
-            # Atualiza os Games Pro (GP) e Games Contra (GC)
             tabelas_novas[g].loc[d1, 'GP'] += p1
             tabelas_novas[g].loc[d1, 'GC'] += p2
             tabelas_novas[g].loc[d2, 'GP'] += p2
             tabelas_novas[g].loc[d2, 'GC'] += p1
             
-            # Quem ganhou ganha o ponto da vitória
             if p1 > p2:
                 tabelas_novas[g].loc[d1, 'Pts'] += 1
                 tabelas_novas[g].loc[d1, 'Vit'] += 1
@@ -85,7 +79,6 @@ def atualizar_classificacao_grupos():
                 tabelas_novas[g].loc[d2, 'Pts'] += 1
                 tabelas_novas[g].loc[d2, 'Vit'] += 1
 
-    # Ordenar pelo regulamento oficial
     for g in tabelas_novas:
         df = tabelas_novas[g]
         df['Saldo'] = df['GP'] - df['GC']
@@ -93,31 +86,33 @@ def atualizar_classificacao_grupos():
         
     st.session_state.tabelas_grupos = tabelas_novas
 
-# --- VISUAL DA QUADRA REESTRUTURADO PARA TV ---
-def desenhar_quadra_virtual(dupla1, dupla2, num_quadra, p1, p2, encerrado, nome_grupo):
+# --- VISUAL COMPACTO DA QUADRA VIRTUAL (FEITO PARA GRIDES) ---
+def desenhar_quadra_virtual(dupla1, dupla2, num_jogo, p1, p2, encerrado, nome_grupo):
+    bg_cor = "#112415" if encerrado else "#121824"
+    borda_cor = "#39ff14" if encerrado else "#1f293d"
+    status_texto = "FIM" if encerrado else "JOGANDO"
     status_cor = "#39ff14" if encerrado else "#ffb703"
-    status_texto = "PLACAR FINAL" if encerrado else f"EM ANDAMENTO • {nome_grupo.upper()}"
     
     html_quadra = f"""
-    <div style="background-color: #121824; border: 3px solid #1f293d; border-radius: 12px; padding: 12px; box-shadow: 0px 8px 16px rgba(0,0,0,0.4); font-family: sans-serif; color: #ffffff; margin-bottom: 12px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <span style="background-color: #39ff14; color: #0b0f19; padding: 3px 8px; font-weight: bold; border-radius: 4px; font-size: 0.75rem;">QUADRA {num_quadra}</span>
-            <span style="color: {status_cor}; font-size: 0.75rem; font-weight: bold; letter-spacing: 1px;">● {status_texto}</span>
+    <div style="background-color: {bg_cor}; border: 2px solid {borda_cor}; border-radius: 8px; padding: 8px; font-family: sans-serif; color: #ffffff; margin-bottom: 8px; box-sizing: border-box;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 0.7rem; font-weight: bold;">
+            <span style="color: #8fa0bc;">JOGO {num_jogo} ({nome_grupo.upper()})</span>
+            <span style="color: {status_cor}; letter-spacing: 0.5px;">● {status_texto}</span>
         </div>
-        <div style="background-color: #1a2333; border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 6px;">
+        <div style="background-color: rgba(0,0,0,0.2); border-radius: 4px; padding: 6px; display: flex; flex-direction: column; gap: 4px;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="font-size: 1rem; font-weight: bold; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80%;">{dupla1}</span>
-                <span style="font-size: 1.4rem; font-weight: 900; color: #39ff14;">{p1 if p1 != "" else "-"}</span>
+                <span style="font-size: 0.85rem; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80%; color: #ffffff;">{dupla1}</span>
+                <span style="font-size: 1.1rem; font-weight: 900; color: #39ff14;">{p1 if p1 != "" else "-"}</span>
             </div>
-            <div style="border-top: 1px dashed #2c3a54; margin: 1px 0;"></div>
+            <div style="border-top: 1px dashed rgba(255,255,255,0.1); margin: 1px 0;"></div>
             <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="font-size: 1rem; font-weight: bold; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80%;">{dupla2}</span>
-                <span style="font-size: 1.4rem; font-weight: 900; color: #ffffff;">{p2 if p2 != "" else "-"}</span>
+                <span style="font-size: 0.85rem; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80%; color: #ffffff;">{dupla2}</span>
+                <span style="font-size: 1.1rem; font-weight: 900; color: #ffffff;">{p2 if p2 != "" else "-"}</span>
             </div>
         </div>
     </div>
     """
-    components.html(html_quadra, height=140, scrolling=False)
+    components.html(html_quadra, height=95, scrolling=False)
 
 # --- SIDEBAR ADMIN ---
 with st.sidebar:
@@ -130,9 +125,9 @@ with st.sidebar:
         st.rerun()
 
 # --- INTERFACE PRINCIPAL ---
-st.markdown(f"<h1 style='text-align:center; color:#39ff14; margin-bottom: 0;'>⚡ {NOME_SISTEMA}</h1>", unsafe_allow_html=True)
+st.markdown(f"<h2 style='text-align:center; color:#39ff14; margin-bottom: 0; padding-top:0;'>⚡ {NOME_SISTEMA}</h2>", unsafe_allow_html=True)
 
-aba_controle, aba_painel_visual = st.tabs(["🎮 Painel de Arbitragem (Admin)", "📺 Telão da Lanchonete (Público)"])
+aba_controle, aba_painel_visual = st.tabs(["... Controles de Arbitragem", "📺 Telão da Lanchonete (Público)"])
 
 with aba_controle:
     # FASE 1: INSCRIÇÕES
@@ -214,60 +209,48 @@ with aba_controle:
                                 atualizar_classificacao_grupos()
                                 st.rerun()
                             else:
-                                st.error("Erro: Um set de padel não pode terminar empatado em games.")
+                                st.error("Erro: Um jogo de padel não termina empatado em games.")
                 else:
-                    st.write(f"Placar atualizado: **{jogo['p1']} x {jogo['p2']}**")
+                    st.write(f"Placar oficial: **{jogo['p1']} x {jogo['p2']}**")
 
-# --- 📺 TELÃO AUTOMÁTICO DA ARENA (REPROJETADO PARA TVS SEM ROLAGEM) ---
+# --- 📺 TELÃO DA ARENA TOTALMENTE OTIMIZADO EM SUPORTE HORIZONTAL ---
 with aba_painel_visual:
-    st.markdown(f"<h3 style='text-align:center; color:#39ff14; font-weight:900; margin-top:0;'>📺 CIRCUITO ARENA - {st.session_state.categoria_selecionada.upper()}</h3>", unsafe_allow_html=True)
+    st.markdown(f"<h3 style='text-align:center; color:#39ff14; font-weight:900; margin-top:0; margin-bottom:5px;'>📺 CIRCUITO ARENA - {st.session_state.categoria_selecionada.upper()}</h3>", unsafe_allow_html=True)
     
     if st.session_state.torneio_fase == "Inscrição":
-        st.info("Aguardando sorteio das chaves.")
+        st.info("Aguardando definição e chaveamento das chaves pelo administrador.")
     else:
-        # Seção Superior: Tabelas dispostas LADO A LADO para economizar espaço vertical
+        # PARTE SUPERIOR: TABELAS DE CLASSIFICAÇÃO LADO A LADO
         st.markdown("<div class='titulo-secao'>📊 Classificação dos Grupos</div>", unsafe_allow_html=True)
-        
         lista_grupos = list(st.session_state.tabelas_grupos.items())
         num_grupos = len(lista_grupos)
         
         if num_grupos > 0:
-            # Cria até 3 colunas horizontais na TV para exibir os grupos lado a lado
-            col_g_tv = st.columns(min(num_grupos, 3))
+            col_g_tv = st.columns(min(num_grupos, 4)) # Até 4 grupos na horizontal perfeitamente
             for i, (nome_g, df_classif) in enumerate(lista_grupos):
-                col_alvo = col_g_tv[i % 3]
+                col_alvo = col_g_tv[i % 4]
                 with col_alvo:
-                    st.markdown(f"<span style='color:#39ff14; font-weight:bold;'>⚔️ {nome_g}</span>", unsafe_allow_html=True)
+                    st.markdown(f"<span style='color:#39ff14; font-weight:bold; font-size:0.95rem;'>⚔️ {nome_g}</span>", unsafe_allow_html=True)
                     st.table(df_classif)
         
-        st.markdown("---")
+        st.markdown("<br>", unsafe_allow_html=True)
         
-        # Seção Inferior: Apenas os jogos ativos ou os últimos decididos para não estourar a tela
-        st.markdown("<div class='titulo-secao'>🎾 Quadras em Destaque (Jogos Ativos)</div>", unsafe_allow_html=True)
+        # PARTE INFERIOR: QUADRO GERAL DE CONFRONTOS (TODOS APARECEM EM GRADE COMPACTA)
+        st.markdown("<div class='titulo-secao'>🎾 Painel Geral de Confrontos (Rodada Completa)</div>", unsafe_allow_html=True)
         
-        # Filtra para exibir prioritariamente jogos em aberto
-        jogos_ativos = [j for j in st.session_state.jogos_grupos if not j["encerrado"]]
+        todos_jogos = st.session_state.jogos_grupos
         
-        # Se todos já acabaram, mostra os encerrados
-        if not jogos_ativos:
-            jogos_ativos = st.session_state.jogos_grupos
-            
-        if jogos_ativos:
-            # Exibe os blocos de quadras divididos em 3 colunas horizontais limpas
-            col_q_tv = st.columns(3)
-            quadra_id_painel = 1
-            for idx_j, jogo in enumerate(jogos_ativos):
-                # Limita a exibição aos primeiros 6 jogos na tela para garantir que cabe sem rolar
-                if quadra_id_painel > 6:
-                    break
-                    
-                col_alvo_q = col_q_tv[(quadra_id_painel - 1) % 3]
+        if todos_jogos:
+            # Organiza os blocos em uma grade limpa de 4 colunas horizontais
+            col_q_tv = st.columns(4)
+            for idx_j, jogo in enumerate(todos_jogos):
+                col_alvo_q = col_q_tv[idx_j % 4]
+                
                 p1_vis = jogo["p1"] if jogo["encerrado"] else ""
                 p2_vis = jogo["p2"] if jogo["encerrado"] else ""
                 
                 with col_alvo_q:
                     desenhar_quadra_virtual(
-                        jogo['d1'], jogo['d2'], quadra_id_painel, 
+                        jogo['d1'], jogo['d2'], idx_j + 1, 
                         p1_vis, p2_vis, jogo["encerrado"], jogo["grupo"]
                     )
-                quadra_id_painel += 1
