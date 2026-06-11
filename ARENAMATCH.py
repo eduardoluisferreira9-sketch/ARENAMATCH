@@ -60,13 +60,10 @@ st.markdown("""
     div[data-testid="stTable"] table { background-color: #121824 !important; width: 100% !important; margin: 0 !important; }
     div[data-testid="stTable"] th { background-color: #060911 !important; color: #39ff14 !important; border: 1px solid #1f293d !important; text-align: center !important; font-size: 0.85rem !important; padding: 6px !important; }
     div[data-testid="stTable"] td { background-color: #121824 !important; color: #ffffff !important; border: 1px solid #1f293d !important; text-align: center !important; font-weight: bold !important; font-size: 0.85rem !important; padding: 6px !important; }
-    
-    button[data-baseweb="tab"] { color: #8fa0bc !important; }
-    button[data-baseweb="tab"][aria-selected="true"] { color: #39ff14 !important; font-weight: bold; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- INICIALIZAÇÃO DE BANCO DE DADOS INTELIGENTE ---
+# --- INICIALIZAÇÃO DE BANCO DE DADOS ---
 if "torneios" not in st.session_state:
     dados_salvos = carregar_dados()
     if dados_salvos is not None:
@@ -83,13 +80,12 @@ if "torneios" not in st.session_state:
                 "jogos_eliminatoria": [] 
             }
 
-# Inicialização de estados auxiliares de navegação
 if "editando_idx" not in st.session_state: st.session_state.editando_idx = None
 if "editando_cat" not in st.session_state: st.session_state.editando_cat = None
 if "tv_cat_ativa" not in st.session_state: st.session_state.tv_cat_ativa = CATEGORIAS_OFICIAIS[0]
 if "tv_pag_ativa" not in st.session_state: st.session_state.tv_pag_ativa = 0
 
-# --- RECALCULADOR DE PONTUAÇÃO CORRIGIDO ---
+# --- RECALCULADOR DE PONTUAÇÃO ---
 def atualizar_classificacao(cat):
     dados = st.session_state.torneios[cat]
     tabelas_novas = {}
@@ -99,7 +95,6 @@ def atualizar_classificacao(cat):
             'Dupla Atleta': lista_duplas, 'Pontos': 0, 'Vitórias': 0, 'GP': 0, 'GC': 0, 'Saldo': 0
         }).set_index('Dupla Atleta')
     
-    # Varre os jogos usando a variável correta para não gerar NameError
     for jogo in dados["jogos_grupos"]:
         if jogo["encerrado"]:
             g = jogo["grupo"]
@@ -119,7 +114,6 @@ def atualizar_classificacao(cat):
     for g in tabelas_novas:
         df = tabelas_novas[g]
         df['Saldo'] = df['GP'] - df['GC']
-        # Converte o DataFrame ordenado em dicionário para que o JSON consiga salvar estruturado
         tabelas_novas[g] = df.sort_values(by=['Pontos', 'Vitórias', 'Saldo', 'GP'], ascending=False).to_dict(orient='index')
         
     st.session_state.torneios[cat]["tabelas_grupos"] = tabelas_novas
@@ -137,7 +131,7 @@ def desenhar_quadra_virtual(dupla1, dupla2, num_jogo, p1, p2, encerrado, f_nome,
     html_quadra = f"""
     <div style="background-color: #121824; border: 2px solid {borda_cor}; border-radius: 8px; padding: 10px; font-family: sans-serif; color: #ffffff; margin-bottom: 8px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 0.7rem; font-weight: bold;">
-            <span style="background-color: #1f293d; color: #39ff14; padding: 1px 5px; border-radius: 3px;">JOGO {num_jogo} ({f_nome.upper()})</span>
+            <span style="background-color: #1f293d; color: #39ff14; padding: 1px 5px; border-radius: 3px;">J JOGO {num_jogo} ({f_nome.upper()})</span>
             <span style="color: {status_cor}; font-weight: 900; letter-spacing: 1px;">● {status_txt}</span>
         </div>
         <div style="background-color: {bg_cor}; border-radius: 5px; padding: 6px; display: flex; flex-direction: column; gap: 4px;">
@@ -155,27 +149,32 @@ def desenhar_quadra_virtual(dupla1, dupla2, num_jogo, p1, p2, encerrado, f_nome,
     """
     components.html(html_quadra, height=115, scrolling=False)
 
-# --- SIDEBAR DE SELEÇÃO DE ARBITRAGEM ---
+# --- ⚙️ CENTRAL DE CONTROLE - SIDEBAR INDEPENDENTE ---
 with st.sidebar:
-    st.markdown("## ⚙️ Central de Arbitragem")
+    st.markdown(f"## 🛠️ Painel {NOME_SISTEMA}")
+    
+    # MUDANÇA CRUCIAL: O modo de tela dita o comportamento do script
+    modo_tela = st.radio("Selecione o Modo de Tela:", ["🎮 Mesa de Arbitragem", "📺 Telão de Transmissão"])
+    st.markdown("---")
+    
     senha = st.text_input("Senha Master Arena:", type="password")
     is_admin = (senha == CHAVE_ADMIN)
+    
     st.markdown("---")
-    cat_foco = st.selectbox("🏆 Escolha o Torneio para Controlar:", CATEGORIAS_OFICIAIS)
+    cat_foco = st.selectbox("🏆 Escolha a Categoria para Gerenciar:", CATEGORIAS_OFICIAIS)
+    
     if is_admin and st.button("🚨 RESETAR TODO O EVENTO"):
         if os.path.exists(ARQUIVO_BANCO): os.remove(ARQUIVO_BANCO)
         st.session_state.clear(); st.rerun()
 
-# --- ABAS PRINCIPAIS ---
 st.markdown(f"<h1 style='text-align:center; color:#39ff14; margin-top:0;'>⚡ {NOME_SISTEMA}</h1>", unsafe_allow_html=True)
-aba_controle, aba_painel_visual = st.tabs(["🎮 Mesa de Controle (Admin)", "📺 Telão da TV (Modo Rotativo Padrão GRIPO)"])
 
 # ----------------------------------------------------
-# ABA 1: MESA DE CONTROLE
+# VISUALIZAÇÃO 1: MESA DE ARBITRAGEM (TRAVADO E SEGURO)
 # ----------------------------------------------------
-with aba_controle:
+if modo_tela == "🎮 Mesa de Arbitragem":
     t_dados = st.session_state.torneios[cat_foco]
-    st.subheader(f"Mesa Operacional: {cat_foco}")
+    st.subheader(f"Mesa Operacional Ativa: {cat_foco}")
     
     # 1. INSCRIÇÕES
     if t_dados["fase"] == "Inscrição":
@@ -214,7 +213,7 @@ with aba_controle:
                     
         if is_admin and len(t_dados["duplas"]) >= 4:
             st.markdown("---")
-            if st.button(f"🎲 Gerar Chaves Automáticas"):
+            if st.button(f"🎲 Gerar Chaves Automáticas (Grupos A e B)"):
                 lista = list(t_dados["duplas"]); random.shuffle(lista)
                 metade = len(lista) // 2
                 st.session_state.torneios[cat_foco]["grupos"] = {"Grupo A": lista[:metade], "Grupo B": lista[metade:]}
@@ -236,7 +235,6 @@ with aba_controle:
         todos_encerrados = all(j["encerrado"] for j in t_dados["jogos_grupos"])
         if todos_encerrados and is_admin:
             if st.button("🏆 FINALIZAR GRUPOS E GERAR MATA-MATA"):
-                # Reconstrói chaves obtendo as chaves do dicionário do banco local
                 chaves_a = list(t_dados["tabelas_grupos"]["Grupo A"].keys())
                 chaves_b = list(t_dados["tabelas_grupos"]["Grupo B"].keys())
                 
@@ -296,12 +294,9 @@ with aba_controle:
                                 salvar_dados(); st.rerun()
 
 # ----------------------------------------------------
-# 📺 ABA 2: TELÃO ORQUESTRADOR BLINDADO CONTRA BUGS
+# VISUALIZAÇÃO 2: TELÃO DE TRANSMISSÃO DE TV (CARROSSEL AUTOMÁTICO)
 # ----------------------------------------------------
-with aba_painel_visual:
-    if st.session_state.tv_cat_ativa not in CATEGORIAS_OFICIAIS:
-        st.session_state.tv_cat_ativa = CATEGORIAS_OFICIAIS[0]
-        
+else:
     cat_tv_render = st.session_state.tv_cat_ativa
     dados_tv = st.session_state.torneios[cat_tv_render]
     
@@ -314,7 +309,6 @@ with aba_painel_visual:
     if dados_tv["fase"] == "Inscrição":
         st.warning(f"Fase de captação de atletas. Sorteio de chaves pendente para: {cat_tv_render}.")
         total_paginas_tv, proxima_pagina = 1, 0
-        
         idx_atual = CATEGORIAS_OFICIAIS.index(cat_tv_render)
         proxima_categoria = CATEGORIAS_OFICIAIS[(idx_atual + 1) % len(CATEGORIAS_OFICIAIS)]
     else:
@@ -337,7 +331,6 @@ with aba_painel_visual:
                 st.markdown("<div class='titulo-secao'>📊 Classificação de Grupos</div>", unsafe_allow_html=True)
                 for nome_g, df_dict in dados_tv["tabelas_grupos"].items():
                     st.markdown(f"<p style='color:#39ff14; font-weight:bold; margin-top:5px;'>⚔️ {nome_g}</p>", unsafe_allow_html=True)
-                    # Reconstrói o DataFrame para exibição limpa na tela
                     df_exibir = pd.DataFrame.from_dict(df_dict, orient='index')
                     st.table(df_exibir)
                 
@@ -368,7 +361,7 @@ with aba_painel_visual:
     st.session_state.tv_pag_ativa = proxima_pagina
     st.session_state.tv_cat_ativa = proxima_categoria
     
-    # 🔄 ATUALIZADOR JAVASCRIPT EM SEGUNDO PLANO (10 SEGUNDOS)
+    # 🔄 ATUALIZADOR SÓ É EXECUTADO SE ESTIVERMOS EXCLUSIVAMENTE NO MODO TELÃO
     componente_js_multicat = """
         <script>
         setTimeout(function() {
