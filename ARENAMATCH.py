@@ -2,7 +2,6 @@ import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
 import random
-import time
 
 # 🎾 CONFIGURAÇÃO DA PÁGINA PREMIUM
 st.set_page_config(
@@ -48,7 +47,7 @@ if "torneio_fase" not in st.session_state: st.session_state.torneio_fase = "Insc
 if "grupos" not in st.session_state: st.session_state.grupos = {}      
 if "jogos_grupos" not in st.session_state: st.session_state.jogos_grupos = [] 
 if "tabelas_grupos" not in st.session_state: st.session_state.tabelas_grupos = {} 
-# Variável para controlar qual página de jogos a TV está mostrando
+# Inicializador da página da TV
 if "tv_pagina_atual" not in st.session_state: st.session_state.tv_pagina_atual = 0
 
 # --- RECALCULADOR MATEMÁTICO ---
@@ -168,27 +167,25 @@ with aba_controle:
                                 atualizar_classificacao_grupos(); st.rerun()
 
 # ----------------------------------------------------
-# 📺 ABA 2: TELÃO DA TV COM CARROSSEL ROTATIVO AUTOMÁTICO
+# 📺 ABA 2: TELÃO DA TV COM CARROSSEL JAVASCRIPT INFINITO
 # ----------------------------------------------------
 with aba_painel_visual:
     if st.session_state.torneio_fase == "Inscrição":
         st.info("Aguardando sorteio das chaves.")
     else:
-        # Configuração do Carrossel (Quantos jogos cabem por vez na tela da direita)
         JOGOS_POR_PAGINA = 6
         todos_jogos = st.session_state.jogos_grupos
         total_jogos = len(todos_jogos)
         
-        # Calcula quantas páginas de jogos existem no total
         total_paginas = (total_jogos + JOGOS_POR_PAGINA - 1) // JOGOS_POR_PAGINA
         
-        # Proteção para manter o índice da página correto
+        # Garante que a página atual está dentro do limite real
         if st.session_state.tv_pagina_atual >= total_paginas:
             st.session_state.tv_pagina_atual = 0
             
         pag_atual = st.session_state.tv_pagina_atual
         
-        # Subtítulo com indicador de página piscante do painel
+        # Cabeçalho com o indicador da página
         st.markdown(f"""
             <h3 style='text-align:center; color:#39ff14; font-weight:900; margin-top:0;'>
                 📺 CIRCUITO ARENA - {st.session_state.categoria_selecionada.upper()} 
@@ -196,7 +193,6 @@ with aba_painel_visual:
             </h3>
         """, unsafe_allow_html=True)
         
-        # Divisão da Tela da TV (45% Classificação estática | 55% Carrossel de Jogos)
         col_tabelas, col_quadras = st.columns([45, 55])
         
         with col_tabelas:
@@ -208,7 +204,6 @@ with aba_painel_visual:
         with col_quadras:
             st.markdown("<div class='titulo-secao'>🎾 Confrontos da Rodada</div>", unsafe_allow_html=True)
             
-            # Corta a lista de jogos para mostrar apenas o lote da página atual
             inicio_idx = pag_atual * JOGOS_POR_PAGINA
             fim_idx = inicio_idx + JOGOS_POR_PAGINA
             lote_jogos = todos_jogos[inicio_idx:fim_idx]
@@ -227,10 +222,22 @@ with aba_painel_visual:
                             jogo['d1'], jogo['d2'], idx_real_do_jogo + 1, 
                             p1_vis, p2_vis, jogo["encerrado"], jogo["grupo"]
                         )
-        
-        # 🔄 MOTOR DE ROTAÇÃO AUTOMÁTICA DA TV (Temporizador de 10 segundos)
+
+        # 🔄 INJETOR DE JAVASCRIPT: MOTOR DE LOOP INFINITO (CORRIGIDO)
         if total_paginas > 1:
-            time.sleep(10) # Aguarda 10 segundos exibindo a página atual
-            # Passa para a próxima página ou volta para a primeira se chegou ao fim
-            st.session_state.tv_pagina_atual = (pag_atual + 1) % total_paginas
-            st.rerun() # Recarrega a tela com os novos jogos
+            # Calcula o próximo passo matemático de forma circular
+            proxima_pag = (pag_atual + 1) % total_paginas
+            
+            # Atualiza o estado via clique simulado oculto no Streamlit usando Javascript limpo
+            # Esse código espera 10000ms (10 segundos) e força a atualização do estado
+            st.session_state.tv_pagina_atual = proxima_pag
+            
+            componente_js_loop = f"""
+                <script>
+                setTimeout(function() {{
+                    window.parent.document.querySelector('iframe').contentWindow.location.reload();
+                }}, 10000);
+                </script>
+            """
+            # Injeta o timer silencioso diretamente no corpo HTML do navegador
+            components.html(componente_js_loop, height=0, width=0)
