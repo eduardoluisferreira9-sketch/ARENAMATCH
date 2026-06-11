@@ -2,8 +2,6 @@ import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
 import random
-import json
-import os
 
 # 🎾 CONFIGURAÇÃO DA PÁGINA PREMIUM
 st.set_page_config(
@@ -32,14 +30,6 @@ st.markdown("""
         color: #ffffff !important; background-color: #121824 !important; border: 2px solid #1f293d !important; border-radius: 8px !important;
     }
     
-    .stButton>button {
-        background-color: #39ff14 !important; color: #0b0f19 !important; font-weight: bold !important; 
-        border-radius: 8px !important; width: 100%; border: none !important; font-size: 1.1rem !important;
-    }
-    .stButton>button:hover {
-        background-color: #2ecc11 !important; box-shadow: 0px 0px 15px rgba(57, 255, 20, 0.4);
-    }
-    
     /* Estilo customizado para tabelas de grupos */
     div[data-testid="stTable"] table { border: 2px solid #1f293d !important; background-color: #121824 !important; width: 100%; }
     div[data-testid="stTable"] th { background-color: #060911 !important; color: #39ff14 !important; border: 1px solid #1f293d !important; text-align: center !important; font-size: 1rem; }
@@ -50,51 +40,60 @@ st.markdown("""
 # --- INICIALIZAÇÃO DO ESTADO ---
 if "duplas" not in st.session_state:
     st.session_state.duplas = []
+if "categoria_selecionada" not in st.session_state:
     st.session_state.categoria_selecionada = "4ª Categoria"
-    st.session_state.torneio_fase = "Inscrição"  # Inscrição, Grupos, MataMata
-    st.session_state.grupos = {}      # {"Grupo A": [duplas]}
-    st.session_state.jogos_grupos = [] # [{"grupo": X, "d1": Y, "d2": Z, "p1": 0, "p2": 0, "encerrado": False}]
-    st.session_state.tabelas_grupos = {} # Armazena os DataFrames de classificação
+if "torneio_fase" not in st.session_state:
+    st.session_state.torneio_fase = "Inscrição"  
+if "grupos" not in st.session_state:
+    st.session_state.grupos = {}      
+if "jogos_grupos" not in st.session_state:
+    st.session_state.jogos_grupos = [] 
+if "tabelas_grupos" not in st.session_state:
+    st.session_state.tabelas_grupos = {} 
 
-# --- RECALCULADOR DA MATRIZ DOS GRUPOS ---
+# --- RECALCULADOR DA MATRIZ DOS GRUPOS (CORRIGIDO) ---
 def atualizar_classificacao_grupos():
-    # Inicializa tabelas limpas para cada grupo
-    st.session_state.tabelas_grupos = {}
+    tabelas_novas = {}
+    # Criar estrutura limpa para cada grupo baseado nas duplas sorteadas
     for nome_g, lista_duplas in st.session_state.grupos.items():
-        st.session_state.tabelas_grupos[nome_g] = pd.DataFrame({
+        tabelas_novas[nome_g] = pd.DataFrame({
             'Dupla Atleta': lista_duplas,
             'Pontos': 0, 'Vitórias': 0, 'Games Pró': 0, 'Games Contra': 0, 'Saldo Games': 0
         }).set_index('Dupla Atleta')
     
-    # Computa os resultados dos jogos encerrados
+    # Computar os dados dos jogos salvos
     for jogo in st.session_state.jogos_grupos:
         if jogo["encerrado"]:
             g = jogo["grupo"]
-            d1, d2 = jogo["d1"], jogo["d2"]
-            p1, p2 = jogo["p1"], jogo["p2"]
+            d1, d2 = jogo["d1"], job["d2"]
+            p1, p2 = int(jogo["p1"]), int(jogo["p2"])
             
-            # Atualiza Games
-            st.session_state.tabelas_grupos[g].loc[d1, 'Games Pró'] += p1
-            st.session_state.tabelas_grupos[g].loc[d1, 'Games Contra'] += p2
-            st.session_state.tabelas_grupos[g].loc[d2, 'Games Pró'] += p2
-            st.session_state.tabelas_grupos[g].loc[d2, 'Games Contra'] += p1
+            # Acumular saldo de games
+            tabelas_novas[g].loc[d1, 'Games Pró'] += p1
+            tabelas_novas[g].loc[d1, 'Games Contra'] += p2
+            tabelas_novas[g].loc[d2, 'Games Pró'] += p2
+            tabelas_novas[g].loc[d2, 'Games Contra'] += p1
             
-            # Vitória e Pontuação (1 ponto por vitória no modelo de grupos)
+            # Computar pontos e vitórias
             if p1 > p2:
-                st.session_state.tabelas_grupos[g].loc[d1, ['Pontos', 'Vitórias']] += [1, 1]
-            else:
-                st.session_state.tabelas_grupos[g].loc[d2, ['Pontos', 'Vitórias']] += [1, 1]
+                tabelas_novas[g].loc[d1, 'Pontos'] += 1
+                tabelas_novas[g].loc[d1, 'Vitórias'] += 1
+            elif p2 > p1:
+                tabelas_novas[g].loc[d2, 'Pontos'] += 1
+                tabelas_novas[g].loc[d2, 'Vitórias'] += 1
 
-    # Calcula Saldo e Ordena de acordo com as regras oficiais do Padel/Beach
-    for g in st.session_state.tabelas_grupos:
-        df = st.session_state.tabelas_grupos[g]
+    # Recalcular saldos de ordenação final
+    for g in tabelas_novas:
+        df = tabelas_novas[g]
         df['Saldo Games'] = df['Games Pró'] - df['Games Contra']
-        st.session_state.tabelas_grupos[g] = df.sort_values(by=['Pontos', 'Saldo Games', 'Games Pró'], ascending=False)
+        tabelas_novas[g] = df.sort_values(by=['Pontos', 'Saldo Games', 'Games Pró'], ascending=False)
+        
+    st.session_state.tabelas_grupos = tabelas_novas
 
 # --- VISUAL DA QUADRA REESTRUTURADO PARA TV ---
 def desenhar_quadra_virtual(dupla1, dupla2, num_quadra, p1, p2, encerrado):
     status_cor = "#39ff14" if encerrado else "#ffb703"
-    status_texto = f"PLACAR FINAL" if encerrado else "EM ANDAMENTO"
+    status_texto = "PLACAR FINAL" if encerrado else "EM ANDAMENTO"
     
     html_quadra = f"""
     <div style="background-color: #121824; border: 3px solid #1f293d; border-radius: 12px; padding: 15px; box-shadow: 0px 8px 16px rgba(0,0,0,0.4); font-family: sans-serif; color: #ffffff; margin-bottom: 15px;">
@@ -127,18 +126,18 @@ with st.sidebar:
         st.session_state.clear()
         st.rerun()
 
-# --- INTEGRAÇÃO DE ABAS ---
+# --- INTERFACE PRINCIPAL ---
+st.markdown(f"<h1 style='text-align:center; color:#39ff14;'>⚡ {NOME_SISTEMA}</h1>", unsafe_allow_html=True)
+
 aba_controle, aba_painel_visual = st.tabs(["🎮 Painel de Arbitragem (Admin)", "📺 Telão da Lanchonete (Público)"])
 
 with aba_controle:
-    # ----------------------------------------------------
-    # FASE 1: INSCRIÇÕES E GERADOR DE CHAVES
-    # ----------------------------------------------------
+    # FASE 1: INSCRIÇÕES
     if st.session_state.torneio_fase == "Inscrição":
         st.markdown("<div class='titulo-secao'>Painel de Inscrições</div>", unsafe_allow_html=True)
         st.session_state.categoria_selecionada = st.selectbox(
             "Selecione a Categoria do Torneio:",
-            ["Masculino Open", "Masculino 4ª Classe", "Masculino 5ª Classe", "Feminino Iniciante", "Misto B"]
+            ["Masculino Open", "Masculino 4ª Classe", "Masculino 5ª Classe", "Feminino Iniciante"]
         )
         
         if is_admin:
@@ -146,7 +145,7 @@ with aba_controle:
                 c1, c2 = st.columns(2)
                 with c1: j1 = st.text_input("Atleta 1:")
                 with c2: j2 = st.text_input("Atleta 2:")
-                if st.form_submit_button("➕ Registrar Dupla na Categoria"):
+                if st.form_submit_button("➕ Registrar Dupla"):
                     if j1 and j2:
                         st.session_state.duplas.append(f"{j1.strip()} / {j2.strip()}")
                         st.rerun()
@@ -163,7 +162,6 @@ with aba_controle:
                 lista_sorteio = list(st.session_state.duplas)
                 random.shuffle(lista_sorteio)
                 
-                # Monta grupos automáticos de 3 ou 4 duplas de acordo com o regulamento do Padel
                 tam = 3 if len(lista_sorteio) <= 7 else 4
                 letra = 'A'
                 st.session_state.grupos = {}
@@ -174,7 +172,6 @@ with aba_controle:
                     nome_g = f"Grupo {letra}"
                     st.session_state.grupos[nome_g] = fatia
                     
-                    # Gera a tabela de confrontos rodada a rodada do grupo
                     for g_i in range(len(fatia)):
                         for g_j in range(g_i + 1, len(fatia)):
                             st.session_state.jogos_grupos.append({
@@ -187,44 +184,40 @@ with aba_controle:
                 st.session_state.torneio_fase = "Grupos"
                 st.rerun()
 
-    # ----------------------------------------------------
-    # FASE 2: ENTRADA DE RESULTADOS DOS GRUPOS
-    # ----------------------------------------------------
+    # FASE 2: ENTRADA DE RESULTADOS (BLINDADA CONTRA TRAVAMENTOS)
     elif st.session_state.torneio_fase == "Grupos":
         st.markdown(f"<div class='titulo-secao'>Lançamento de Resultados - {st.session_state.categoria_selecionada}</div>", unsafe_allow_html=True)
         
         if not is_admin:
-            st.info("🔒 Use a senha de Administrador na barra lateral para computar os resultados das quadras.")
+            st.info("🔒 Use a senha de Administrador na barra lateral para computar os resultados.")
             
         for idx, jogo in enumerate(st.session_state.jogos_grupos):
-            cor_status = "🟢 CONCLUÍDO" if jogo["encerrado"] else "⏳ EM ABERTO"
-            with st.expander(f"➔ [{jogo['grupo']}] Jogo {idx+1}: {jogo['d1']} VS {jogo['d2']} | {cor_status}"):
+            status_txt = "🟢 CONCLUÍDO" if jogo["encerrado"] else "⏳ EM ABERTO"
+            
+            # Usando uma chave totalmente única por expander e formulário
+            with st.expander(f"➔ [{jogo['grupo']}] {jogo['d1']} VS {jogo['d2']} | {status_txt}"):
                 if is_admin:
-                    c1, c2, c3 = st.columns([2, 2, 2])
-                    with c1:
-                        g1 = st.number_input(f"Games - {jogo['d1'][:15]}", 0, 7, int(jogo["p1"]), key=f"in_p1_{idx}")
-                    with c2:
-                        g2 = st.number_input(f"Games - {jogo['d2'][:15]}", 0, 7, int(jogo["p2"]), key=f"in_p2_{idx}")
-                    with c3:
-                        st.write("") # Alinhamento vertical
-                        st.write("")
-                        if st.form_submit_button or st.button("Salvar Súmula", key=f"btn_save_{idx}"):
-                            # Validação básica de set de padel (ex: 6x4, 6x1, 7x5 ou 7x6 em caso de tie-break)
-                            if (g1 >= 6 or g2 >= 6) and (g1 != g2):
-                                jogo["p1"] = g1
-                                jogo["p2"] = g2
-                                jogo["encerrado"] = True
+                    # Cada jogo agora ganha um formulário próprio isolado
+                    with st.form(key=f"form_jogo_{idx}"):
+                        col_g1, col_g2 = st.columns(2)
+                        with col_g1:
+                            g1 = st.number_input(f"Games {jogo['d1'][:12]}", 0, 7, value=int(jogo["p1"]), key=f"p1_val_{idx}")
+                        with col_g2:
+                            g2 = st.number_input(f"Games {jogo['d2'][:12]}", 0, 7, value=int(jogo["p2"]), key=f"p2_val_{idx}")
+                        
+                        if st.form_submit_button("💾 Salvar Placar"):
+                            if g1 != g2: # Validação simples: não aceita empate em set de tênis/padel
+                                st.session_state.jogos_grupos[idx]["p1"] = g1
+                                st.session_state.jogos_grupos[idx]["p2"] = g2
+                                st.session_state.jogos_grupos[idx]["encerrado"] = True
                                 atualizar_classificacao_grupos()
-                                st.success("Placar atualizado!")
                                 st.rerun()
                             else:
-                                st.error("Placar inválido para fim de Set de Padel (Ex: Alguém precisa somar 6 ou 7 games).")
+                                st.error("Erro: Um set de padel/beach não pode terminar empatado em games.")
                 else:
-                    st.write(f"**Resultado Vigente:** {jogo['p1']} vs {jogo['p2']}")
+                    st.write(f"Placar atualizado pelos árbitros: **{jogo['p1']} x {jogo['p2']}**")
 
-# ----------------------------------------------------
-# 📺 TELÃO AUTOMÁTICO DA ARENA (PARA MOSTRAR NA TV)
-# ----------------------------------------------------
+# --- 📺 TELÃO AUTOMÁTICO DA ARENA (PARA MOSTRAR NA TV) ---
 with aba_painel_visual:
     st.markdown(f"<h2 style='text-align:center; color:#39ff14; font-weight:900;'>📺 COPA ARENA - {st.session_state.categoria_selecionada.upper()}</h2>", unsafe_allow_html=True)
     st.markdown("---")
