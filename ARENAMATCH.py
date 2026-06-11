@@ -15,7 +15,7 @@ CHAVE_ADMIN = "arena123"
 CATEGORIAS_OFICIAIS = ["Masculino 4ª Classe", "Feminino Iniciante", "Misto B"]
 TOTAL_QUADRAS_CLUBE = 4 
 
-# 🎨 DESIGN ESPORTIVO PROFISSIONAL PREMIUM
+# 🎨 DESIGN ESPORTIVO PROFISSIONAL PREMIUM (CONTRASTE CONFIGURADO)
 st.markdown("""
     <style>
     .stApp { background-color: #0b0f19 !important; } 
@@ -49,7 +49,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- INICIALIZAÇÃO DO BANCO DE DADOS EM MEMÓRIA ---
+# --- INICIALIZAÇÃO DE BANCO DE DADOS SEGURO ---
 if "torneios" not in st.session_state:
     st.session_state.torneios = {}
     for cat in CATEGORIAS_OFICIAIS:
@@ -62,24 +62,30 @@ if "torneios" not in st.session_state:
             "jogos_eliminatoria": [] 
         }
 
+# Controle de edição de registros
 if "editando_idx" not in st.session_state: st.session_state.editando_idx = None
 if "editando_cat" not in st.session_state: st.session_state.editando_cat = None
-if "tv_cat_index" not in st.session_state: st.session_state.tv_cat_index = 0
-if "tv_pag_index" not in st.session_state: st.session_state.tv_pag_index = 0
 
-# --- RECALCULADOR DE PONTUAÇÃO ---
+# 🚨 SISTEMA DE ROTAÇÃO INDEPENDENTE PARA A TV (SEM CONFLITO COM SIDEBAR)
+if "tv_cat_ativa" not in st.session_state: st.session_state.tv_cat_ativa = CATEGORIAS_OFICIAIS[0]
+if "tv_pag_ativa" not in st.session_state: st.session_state.tv_pag_ativa = 0
+
+# --- PROCESSADOR MATEMÁTICO DE JOGOS ---
 def atualizar_classificacao(cat):
     dados = st.session_state.torneios[cat]
     tabelas_novas = {}
+    
     for nome_g, lista_duplas in dados["grupos"].items():
         tabelas_novas[nome_g] = pd.DataFrame({
             'Dupla Atleta': lista_duplas, 'Pontos': 0, 'Vitórias': 0, 'GP': 0, 'GC': 0, 'Saldo': 0
         }).set_index('Dupla Atleta')
     
     for jogo in dados["jogos_grupos"]:
-        if jogo["encerrado"]:
-            g, d1, d2 = jogo["grupo"], jogo["d1"], jogo["d2"]
-            p1, p2 = int(jogo["p1"]), int(jogo["p2"])
+        if juego["encerrado"]:
+            g = juego["grupo"]
+            d1, d2 = juego["d1"], juego["d2"]
+            p1, p2 = int(juego["p1"]), int(juego["p2"])
+            
             if d1 in tabelas_novas[g].index and d2 in tabelas_novas[g].index:
                 tabelas_novas[g].loc[d1, 'GP'] += p1
                 tabelas_novas[g].loc[d1, 'GC'] += p2
@@ -94,9 +100,10 @@ def atualizar_classificacao(cat):
         df = tabelas_novas[g]
         df['Saldo'] = df['GP'] - df['GC']
         tabelas_novas[g] = df.sort_values(by=['Pontos', 'Vitórias', 'Saldo', 'GP'], ascending=False)
+        
     st.session_state.torneios[cat]["tabelas_grupos"] = tabelas_novas
 
-# --- CARD DE CONFRONTO ESTILO GRIPO ---
+# --- CARD VISUAL DE CONFRONTO DA TV ---
 def desenhar_quadra_virtual(dupla1, dupla2, num_jogo, p1, p2, encerrado, f_nome, quadra):
     if encerrado:
         bg_cor, borda_cor, status_txt, status_cor = "#112415", "#39ff14", "FINALIZADO", "#39ff14"
@@ -108,35 +115,35 @@ def desenhar_quadra_virtual(dupla1, dupla2, num_jogo, p1, p2, encerrado, f_nome,
     html_quadra = f"""
     <div style="background-color: #121824; border: 2px solid {borda_cor}; border-radius: 8px; padding: 10px; font-family: sans-serif; color: #ffffff; margin-bottom: 8px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 0.7rem; font-weight: bold;">
-            <span style="background-color: #1f293d; color: #39ff14; padding: 1px 5px; border-radius: 3px;">JOGO {num_jogo} ({f_nome.upper()})</span>
+            <span style="background-color: #1f293d; color: #39ff14; padding: 1px 5px; border-radius: 3px;">J JOGO {num_jogo} ({f_nome.upper()})</span>
             <span style="color: {status_cor}; font-weight: 900; letter-spacing: 1px;">● {status_txt}</span>
         </div>
         <div style="background-color: {bg_cor}; border-radius: 5px; padding: 6px; display: flex; flex-direction: column; gap: 4px;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <span style="font-size: 0.85rem; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 75%; color: #ffffff;">{dupla1}</span>
-                <span style="font-size: 1.1rem; font-weight: 900; color: #39ff14;">{p1 if p1 is not None and p1 != "" else "-"}</span>
+                <span style="font-size: 1.1rem; font-weight: 900; color: #39ff14;">{p1 if encerrado else "-"}</span>
             </div>
             <div style="border-top: 1px dashed #2c3a54; margin: 1px 0;"></div>
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <span style="font-size: 0.85rem; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 75%; color: #ffffff;">{dupla2}</span>
-                <span style="font-size: 1.1rem; font-weight: 900; color: #ffffff;">{p2 if p2 is not None and p2 != "" else "-"}</span>
+                <span style="font-size: 1.1rem; font-weight: 900; color: #ffffff;">{p2 if encerrado else "-"}</span>
             </div>
         </div>
     </div>
     """
     components.html(html_quadra, height=115, scrolling=False)
 
-# --- SIDEBAR ADMIN ---
+# --- SIDEBAR DE SELEÇÃO DE ARBITRAGEM ---
 with st.sidebar:
     st.markdown("## ⚙️ Central de Arbitragem")
     senha = st.text_input("Senha Master Arena:", type="password")
     is_admin = (senha == CHAVE_ADMIN)
     st.markdown("---")
-    cat_foco = st.selectbox("🏆 Escolha o Torneio:", CATEGORIAS_OFICIAIS)
+    cat_foco = st.selectbox("🏆 Escolha o Torneio para Controlar:", CATEGORIAS_OFICIAIS)
     if is_admin and st.button("🚨 RESETAR TODO O EVENTO"):
         st.session_state.clear(); st.rerun()
 
-# --- INTERFACE PRINCIPAL ---
+# --- ABAS PRINCIPAIS ---
 st.markdown(f"<h1 style='text-align:center; color:#39ff14; margin-top:0;'>⚡ {NOME_SISTEMA}</h1>", unsafe_allow_html=True)
 aba_controle, aba_painel_visual = st.tabs(["🎮 Mesa de Controle (Admin)", "📺 Telão da TV (Modo Rotativo Padrão GRIPO)"])
 
@@ -147,7 +154,7 @@ with aba_controle:
     t_dados = st.session_state.torneios[cat_foco]
     st.subheader(f"Mesa Operacional: {cat_foco}")
     
-    # FASE 1: INSCRIÇÕES
+    # 1. INSCRIÇÕES
     if t_dados["fase"] == "Inscrição":
         st.markdown("<div class='titulo-secao'>Inscrições da Categoria</div>", unsafe_allow_html=True)
         if is_admin:
@@ -157,7 +164,7 @@ with aba_controle:
                 with st.form("edit_dupla_form"):
                     novo_j1 = st.text_input("Atleta 1:", value=a1)
                     novo_j2 = st.text_input("Atleta 2:", value=a2)
-                    if st.form_submit_button("💾 Salvar Registro Corrigido"):
+                    if st.form_submit_button("💾 Salvar Modificação"):
                         st.session_state.torneios[cat_foco]["duplas"][idx_alvo] = f"{novo_j1.strip()} / {novo_j2.strip()}"
                         st.session_state.editando_idx, st.session_state.editando_cat = None, None
                         st.rerun()
@@ -180,11 +187,12 @@ with aba_controle:
                     
         if is_admin and len(t_dados["duplas"]) >= 4:
             st.markdown("---")
-            if st.button(f"🎲 Gerar Chaves Automáticas (Mínimo 2 Grupos)"):
+            if st.button(f"🎲 Gerar Chaves Automáticas"):
                 lista = list(t_dados["duplas"]); random.shuffle(lista)
                 metade = len(lista) // 2
                 st.session_state.torneios[cat_foco]["grupos"] = {"Grupo A": lista[:metade], "Grupo B": lista[metade:]}
                 st.session_state.torneios[cat_foco]["jogos_grupos"] = []
+                
                 for g_nome, f_duplas in st.session_state.torneios[cat_foco]["grupos"].items():
                     for i in range(len(f_duplas)):
                         for j in range(i+1, len(f_duplas)):
@@ -194,22 +202,19 @@ with aba_controle:
                 st.session_state.torneios[cat_foco]["fase"] = "Grupos"
                 atualizar_classificacao(cat_foco); st.rerun()
 
-    # FASE 2: GRUPOS E LANÇAMENTOS DE RESULTADOS
+    # 2. FASE DE GRUPOS
     elif t_dados["fase"] == "Grupos":
         st.markdown("<div class='titulo-secao'>Painel de Lançamento e Chamada de Quadras</div>", unsafe_allow_html=True)
         
         todos_encerrados = all(j["encerrado"] for j in t_dados["jogos_grupos"])
         if todos_encerrados and is_admin:
-            if st.button("🏆 FINALIZAR GRUPOS E CONVOCAR MATA-MATA"):
+            if st.button("🏆 FINALIZAR GRUPOS E GERAR MATA-MATA"):
                 df_a = t_dados["tabelas_grupos"]["Grupo A"]
                 df_b = t_dados["tabelas_grupos"]["Grupo B"]
                 
-                primeiro_a, segundo_a = df_a.index[0], df_a.index[1]
-                primeiro_b, segundo_b = df_b.index[0], df_b.index[1]
-                
                 st.session_state.torneios[cat_foco]["jogos_eliminatoria"] = [
-                    {"fase": "Semifinal 1", "d1": primeiro_a, "d2": segundo_b, "p1": 0, "p2": 0, "encerrado": False, "quadra": "Chamando..."},
-                    {"fase": "Semifinal 2", "d1": primeiro_b, "d2": segundo_a, "p1": 0, "p2": 0, "encerrado": False, "quadra": "Chamando..."},
+                    {"fase": "Semifinal 1", "d1": df_a.index[0], "d2": df_b.index[1], "p1": 0, "p2": 0, "encerrado": False, "quadra": "Chamando..."},
+                    {"fase": "Semifinal 2", "d1": df_b.index[0], "d2": df_a.index[1], "p1": 0, "p2": 0, "encerrado": False, "quadra": "Chamando..."},
                     {"fase": "Grande Final", "d1": "Vencedor Semi 1", "d2": "Vencedor Semi 2", "p1": 0, "p2": 0, "encerrado": False, "quadra": "Chamando..."}
                 ]
                 st.session_state.torneios[cat_foco]["fase"] = "Eliminatoria"
@@ -225,16 +230,16 @@ with aba_controle:
                         
                     with st.form(key=f"f_j_g_{cat_foco}_{idx}"):
                         col_g1, col_g2 = st.columns(2)
-                        with col_g1: g1 = st.number_input("Games D1", 0, 7, value=int(juego["p1"]), key=f"val_p1_{cat_foco}_{idx}")
-                        with col_g2: g2 = st.number_input("Games D2", 0, 7, value=int(juego["p2"]), key=f"val_p2_{cat_foco}_{idx}")
-                        if st.form_submit_button("Lançar Resultado"):
+                        with col_g1: g1 = st.number_input("Games D1", 0, 7, value=int(juego["p1"]))
+                        with col_g2: g2 = st.number_input("Games D2", 0, 7, value=int(juego["p2"]))
+                        if st.form_submit_button("Lançar Placar"):
                             if g1 != g2:
-                                st.session_state.torneios[cat_foco]["jogos_grupos"][idx]["p1"] = g1
-                                st.session_state.torneios[cat_foco]["jogos_grupos"][idx]["p2"] = g2
+                                st.session_state.torneios[cat_foco]["jogos_grupos"][idx]["p1"] = int(g1)
+                                st.session_state.torneios[cat_foco]["jogos_grupos"][idx]["p2"] = int(g2)
                                 st.session_state.torneios[cat_foco]["jogos_grupos"][idx]["encerrado"] = True
                                 atualizar_classificacao(cat_foco); st.rerun()
 
-    # FASE 3: ELIMINATÓRIAS
+    # 3. FASE DE PLAYOFFS
     elif t_dados["fase"] == "Eliminatoria":
         st.markdown("<div class='titulo-secao'>Chaves de Playoffs (Mata-Mata)</div>", unsafe_allow_html=True)
         for idx, juego in enumerate(t_dados["jogos_eliminatoria"]):
@@ -247,12 +252,12 @@ with aba_controle:
                         
                     with st.form(key=f"f_j_e_{cat_foco}_{idx}"):
                         col_g1, col_g2 = st.columns(2)
-                        with col_g1: g1 = st.number_input("Games D1", 0, 7, value=int(juego["p1"]), key=f"val_e1_{cat_foco}_{idx}")
-                        with col_g2: g2 = st.number_input("Games D2", 0, 7, value=int(juego["p2"]), key=f"val_e2_{cat_foco}_{idx}")
-                        if st.form_submit_button("Salvar Placar Eliminatório"):
+                        with col_g1: g1 = st.number_input("Games D1", 0, 7, value=int(juego["p1"]))
+                        with col_g2: g2 = st.number_input("Games D2", 0, 7, value=int(juego["p2"]))
+                        if st.form_submit_button("Salvar Placar Mata-Mata"):
                             if g1 != g2:
-                                st.session_state.torneios[cat_foco]["jogos_eliminatoria"][idx]["p1"] = g1
-                                st.session_state.torneios[cat_foco]["jogos_eliminatoria"][idx]["p2"] = g2
+                                st.session_state.torneios[cat_foco]["jogos_eliminatoria"][idx]["p1"] = int(g1)
+                                st.session_state.torneios[cat_foco]["jogos_eliminatoria"][idx]["p2"] = int(g2)
                                 st.session_state.torneios[cat_foco]["jogos_eliminatoria"][idx]["encerrado"] = True
                                 
                                 vencedor = juego['d1'] if g1 > g2 else juego['d2']
@@ -261,26 +266,26 @@ with aba_controle:
                                 st.rerun()
 
 # ----------------------------------------------------
-# 📺 ABA 2: TELÃO ORQUESTRADOR MULTI-TORNEIOS 
+# 📺 ABA 2: TELÃO ORQUESTRADOR BLINDADO CONTRA BUGS
 # ----------------------------------------------------
 with aba_painel_visual:
-    # Garante segurança de escopo contra manipulações na aba admin
-    if st.session_state.tv_cat_index >= len(CATEGORIAS_OFICIAIS):
-        st.session_state.tv_cat_index = 0
-        
-    categoria_tv = CATEGORIAS_OFICIAIS[st.session_state.tv_cat_index]
-    dados_tv = st.session_state.torneios[categoria_tv]
+    # Captura a categoria correta da rotação independente
+    cat_tv_render = st.session_state.tv_cat_ativa
+    dados_tv = st.session_state.torneios[cat_tv_render]
     
     st.markdown(f"""
         <h2 style='text-align:center; color:#39ff14; font-weight:900; margin-top:0; background-color:#121824; padding:10px; border-radius:8px;'>
-            📺 CIRCUITO ARENA - {categoria_tv.upper()}
+            📺 CIRCUITO ARENA - {cat_tv_render.upper()}
         </h2>
     """, unsafe_allow_html=True)
     
     if dados_tv["fase"] == "Inscrição":
-        st.warning(f"Fase de captação de atletas. Sorteio de chaves pendente para: {categoria_tv}.")
+        st.warning(f"Fase de captação de atletas. Sorteio de chaves pendente para: {cat_tv_render}.")
         total_paginas_tv, proxima_pagina = 1, 0
-        proximo_cat_index = (st.session_state.tv_cat_index + 1) % len(CATEGORIAS_OFICIAIS)
+        
+        # Avança para a próxima categoria no próximo ciclo de 10s
+        idx_atual = CATEGORIAS_OFICIAIS.index(cat_tv_render)
+        proxima_categoria = CATEGORIAS_OFICIAIS[(idx_atual + 1) % len(CATEGORIAS_OFICIAIS)]
     else:
         jogos_alvo_tv = dados_tv["jogos_eliminatoria"] if dados_tv["fase"] == "Eliminatoria" else dados_tv["jogos_grupos"]
         
@@ -288,10 +293,8 @@ with aba_painel_visual:
         total_jogos_tv = len(jogos_alvo_tv)
         total_paginas_tv = (total_jogos_tv + JOGOS_POR_PAGINA - 1) // JOGOS_POR_PAGINA
         
-        if st.session_state.tv_pag_index >= total_paginas_tv: 
-            st.session_state.tv_pag_index = 0
-            
-        pag_atual_tv = st.session_state.tv_pag_index
+        pag_atual_tv = st.session_state.tv_pag_ativa
+        if pag_atual_tv >= total_paginas_tv: pag_atual_tv = 0
         
         col_esq, col_dir = st.columns([45, 55])
         
@@ -316,25 +319,25 @@ with aba_painel_visual:
                 for i_lote, jogo in enumerate(lote_jogos_tv):
                     idx_real = inicio_idx + i_lote
                     col_alvo = grid_quadras_tv[i_lote % 2]
-                    
-                    p1_v = jogo["p1"] if jogo["encerrado"] else ""
-                    p2_v = jogo["p2"] if jogo["encerrado"] else ""
                     f_tag = jogo["fase"] if "fase" in jogo else jogo["grupo"]
                     
                     with col_alvo:
-                        desenhar_quadra_virtual(jogo['d1'], jogo['d2'], idx_real + 1, p1_v, p2_v, jogo["encerrado"], f_tag, jogo["quadra"])
+                        desenhar_quadra_virtual(jogo['d1'], jogo['d2'], idx_real + 1, jogo["p1"], jogo["p2"], jogo["encerrado"], f_tag, jogo["quadra"])
 
+        # Cálculo de Próximo Passo Sem Interrupção
         if (pag_atual_tv + 1) < total_paginas_tv:
             proxima_pagina = pag_atual_tv + 1
-            proximo_cat_index = st.session_state.tv_cat_index
+            proxima_categoria = cat_tv_render
         else:
             proxima_pagina = 0
-            proximo_cat_index = (st.session_state.tv_cat_index + 1) % len(CATEGORIAS_OFICIAIS)
+            idx_atual = CATEGORIAS_OFICIAIS.index(cat_tv_render)
+            proxima_categoria = CATEGORIAS_OFICIAIS[(idx_atual + 1) % len(CATEGORIAS_OFICIAIS)]
 
-    st.session_state.tv_pag_index = proxima_pagina
-    st.session_state.tv_cat_index = proximo_cat_index
+    # Salva os próximos passos sem cruzar com a Sidebar
+    st.session_state.tv_pag_ativa = proxima_pagina
+    st.session_state.tv_cat_ativa = proxima_categoria
     
-    # 🔄 ATUALIZADOR JAVASCRIPT CORRIGIDO DE ESCOPO 
+    # 🔄 ATUALIZADOR JAVASCRIPT EM SEGUNDO PLANO (10 SEGUNDOS)
     componente_js_multicat = """
         <script>
         setTimeout(function() {
