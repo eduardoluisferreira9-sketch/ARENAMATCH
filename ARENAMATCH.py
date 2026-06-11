@@ -131,7 +131,7 @@ def desenhar_quadra_virtual(dupla1, dupla2, num_jogo, p1, p2, encerrado, f_nome,
     html_quadra = f"""
     <div style="background-color: #121824; border: 2px solid {borda_cor}; border-radius: 8px; padding: 10px; font-family: sans-serif; color: #ffffff; margin-bottom: 8px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 0.7rem; font-weight: bold;">
-            <span style="background-color: #1f293d; color: #39ff14; padding: 1px 5px; border-radius: 3px;">J JOGO {num_jogo} ({f_nome.upper()})</span>
+            <span style="background-color: #1f293d; color: #39ff14; padding: 1px 5px; border-radius: 3px;">JOGO {num_jogo} ({f_nome.upper()})</span>
             <span style="color: {status_cor}; font-weight: 900; letter-spacing: 1px;">● {status_txt}</span>
         </div>
         <div style="background-color: {bg_cor}; border-radius: 5px; padding: 6px; display: flex; flex-direction: column; gap: 4px;">
@@ -149,20 +149,24 @@ def desenhar_quadra_virtual(dupla1, dupla2, num_jogo, p1, p2, encerrado, f_nome,
     """
     components.html(html_quadra, height=115, scrolling=False)
 
-# --- ⚙️ CENTRAL DE CONTROLE - SIDEBAR INDEPENDENTE ---
+# --- ⚙️ CENTRAL DE CONTROLE - SIDEBAR COMOCIONAL INTELLIGENT ---
 with st.sidebar:
     st.markdown(f"## 🛠️ Painel {NOME_SISTEMA}")
     
-    # MUDANÇA CRUCIAL: O modo de tela dita o comportamento do script
     modo_tela = st.radio("Selecione o Modo de Tela:", ["🎮 Mesa de Arbitragem", "📺 Telão de Transmissão"])
     st.markdown("---")
     
     senha = st.text_input("Senha Master Arena:", type="password")
     is_admin = (senha == CHAVE_ADMIN)
-    
     st.markdown("---")
-    cat_foco = st.selectbox("🏆 Escolha a Categoria para Gerenciar:", CATEGORIAS_OFICIAIS)
     
+    # 🚨 BLINDAGEM DO BUG: Só exibe o seletor se você estiver na mesa administrando!
+    if modo_tela == "🎮 Mesa de Arbitragem":
+        cat_foco = st.selectbox("🏆 Escolha a Categoria para Gerenciar:", CATEGORIAS_OFICIAIS)
+    else:
+        st.info("📺 **Modo TV Ativo:** O telão está alternando as categorias automaticamente a cada 10s.")
+        cat_foco = CATEGORIAS_OFICIAIS[0] # Valor padrão neutro de background
+        
     if is_admin and st.button("🚨 RESETAR TODO O EVENTO"):
         if os.path.exists(ARQUIVO_BANCO): os.remove(ARQUIVO_BANCO)
         st.session_state.clear(); st.rerun()
@@ -361,7 +365,7 @@ else:
     st.session_state.tv_pag_ativa = proxima_pagina
     st.session_state.tv_cat_ativa = proxima_categoria
     
-    # 🔄 ATUALIZADOR SÓ É EXECUTADO SE ESTIVERMOS EXCLUSIVAMENTE NO MODO TELÃO
+    # 🔄 ATUALIZADOR AUTOMÁTICO (10 SEGUNDOS)
     componente_js_multicat = """
         <script>
         setTimeout(function() {
